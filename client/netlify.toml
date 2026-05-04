@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  VITE_API_URL = "https://YOUR_RENDER_BACKEND_URL/api"
+  VITE_API_URL = "https://naac-pbne.onrender.com/api"
 
 [[redirects]]
   from = "/*"
