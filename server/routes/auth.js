@@ -63,9 +63,9 @@ router.post("/forgot-password", async (req, res) => {
     await PasswordReset.create({ user: user._id, token, otpHash, expiresAt: new Date(Date.now() + 10 * 60 * 1000) });
     const email = await sendPasswordOtpEmail({ to: user.email, name: user.name, otp });
     await logAction(user._id, "PASSWORD_RESET_REQUEST", "User", user.email);
-    return res.json({ message: "OTP sent to your login email.", resetToken: token, email: { to: user.email, messageId: email.messageId } });
+    return res.json({ message: "OTP sent to your registered email.", resetToken: token, email: { to: user.email, messageId: email.messageId } });
   }
-  res.json({ message: "If the account exists, an OTP will be sent to the login email." });
+  res.json({ message: "If the account exists, an OTP will be sent to the registered email." });
 });
 
 router.post("/reset-password", async (req, res) => {

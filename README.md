@@ -154,6 +154,18 @@ This file is intentionally ignored by Git so a personal signature is not uploade
 
 The app stores multiple role sessions in the browser and shows an `Active logins` switcher in the sidebar when more than one role has logged in.
 
+## Forgot Password
+
+The forgot-password flow sends a 6-digit OTP to the user's registered/login email.
+
+1. Enter registered email on the login page.
+2. Click `Forgot Password`.
+3. Enter the OTP received by email.
+4. Enter and confirm the new password.
+5. Login with the new password.
+
+The OTP is valid for 10 minutes and is stored hashed in MongoDB.
+
 ## Main API Routes
 
 - `POST /api/auth/register`
