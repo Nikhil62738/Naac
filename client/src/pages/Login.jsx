@@ -39,6 +39,7 @@ export default function Login() {
         confirmPassword: "",
         message: data.email?.to ? `OTP sent to ${data.email.to}` : data.message
       });
+      if (data.resetToken) setMode("forgot");
     } catch (err) {
       setError(err.response?.data?.message || "Could not send OTP");
     }
@@ -67,7 +68,7 @@ export default function Login() {
   function openForgot() {
     setError("");
     setReset({ token: "", email: "", otp: "", newPassword: "", confirmPassword: "", message: "" });
-    setMode("forgot");
+    forgot();
   }
 
   function backToLogin() {
@@ -95,14 +96,6 @@ export default function Login() {
       <form className="auth-card" onSubmit={(e) => e.preventDefault()}>
         <span className="eyebrow">Password Recovery</span>
         <h1>Reset Password</h1>
-        {!reset.token && (
-          <>
-            <input placeholder="Registered email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            {error && <p className="error">{error}</p>}
-            <button type="button" onClick={forgot}>Send OTP</button>
-            <button type="button" className="secondary" onClick={backToLogin}>Back to Login</button>
-          </>
-        )}
         {reset.message && <p className="success">{reset.message}</p>}
         {reset.token && (
           <div className="reset-box">
