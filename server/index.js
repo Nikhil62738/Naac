@@ -16,9 +16,18 @@ dotenv.config({ path: path.join(__dirname, ".env"), override: true });
 
 const app = express();
 const port = process.env.PORT || 5000;
+const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  }
+}));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 app.use("/uploads", (_req, res) => res.status(403).json({ message: "Files require authenticated download" }));
