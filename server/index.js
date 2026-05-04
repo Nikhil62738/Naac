@@ -43,6 +43,8 @@ app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 app.use("/uploads", (_req, res) => res.status(403).json({ message: "Files require authenticated download" }));
 
+app.get("/", (_req, res) => res.json({ ok: true, service: "NAAC File Management API" }));
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api", submissionRoutes);

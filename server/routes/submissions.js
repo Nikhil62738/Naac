@@ -161,14 +161,19 @@ router.patch("/hod/review", requireRole("hod", "iqac"), async (req, res) => {
   );
   const message = `${criterionCode} marked ${status}. ${reviewComment || ""}`;
   const notification = await Notification.create({ recipient: teacherId, sender: req.user._id, message });
-  const email = await sendVerificationEmail({
-    to: teacher.email,
-    teacherName: teacher.name,
-    senderName: req.user.name,
-    criterionCode,
-    status,
-    comment: reviewComment || ""
-  });
+  let email = { messageId: "", preview: "" };
+  try {
+    email = await sendVerificationEmail({
+      to: teacher.email,
+      teacherName: teacher.name,
+      senderName: req.user.name,
+      criterionCode,
+      status,
+      comment: reviewComment || ""
+    });
+  } catch (error) {
+    await logAction(req.user._id, "VERIFICATION_EMAIL_FAILED", "Notification", `${teacher.email}: ${error.message}`);
+  }
   await logAction(req.user._id, "REVIEW_SUBMISSION", criterionCode, `${teacher.email}: ${status}`);
   await logAction(req.user._id, "SEND_VERIFICATION_EMAIL", "Notification", `${teacher.email}: ${email.messageId || "demo-json"}`);
   res.json({ submission, notification, email: { ...email, to: teacher.email } });
@@ -180,12 +185,17 @@ router.post("/hod/reminders", requireRole("hod", "iqac"), async (req, res) => {
   if (!teacher) return res.status(404).json({ message: "Teacher not found" });
   const reminderMessage = message || "Please complete your pending NAAC submissions.";
   const note = await Notification.create({ recipient: teacherId, sender: req.user._id, message: reminderMessage });
-  const email = await sendReminderEmail({
-    to: teacher.email,
-    teacherName: teacher.name,
-    senderName: req.user.name,
-    message: reminderMessage
-  });
+  let email = { messageId: "", preview: "" };
+  try {
+    email = await sendReminderEmail({
+      to: teacher.email,
+      teacherName: teacher.name,
+      senderName: req.user.name,
+      message: reminderMessage
+    });
+  } catch (error) {
+    await logAction(req.user._id, "REMINDER_EMAIL_FAILED", "Notification", `${teacher.email}: ${error.message}`);
+  }
   await logAction(req.user._id, "SEND_REMINDER_EMAIL", "Notification", `${teacher.email}: ${email.messageId || "demo-json"}`);
   res.status(201).json({ notification: note, email: { ...email, to: teacher.email } });
 });

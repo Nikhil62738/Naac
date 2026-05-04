@@ -61,7 +61,14 @@ router.post("/forgot-password", async (req, res) => {
     const otpHash = await bcrypt.hash(otp, 10);
     const token = crypto.randomBytes(24).toString("hex");
     await PasswordReset.create({ user: user._id, token, otpHash, expiresAt: new Date(Date.now() + 10 * 60 * 1000) });
-    const email = await sendPasswordOtpEmail({ to: user.email, name: user.name, otp });
+    let email;
+    try {
+      email = await sendPasswordOtpEmail({ to: user.email, name: user.name, otp });
+    } catch (error) {
+      await PasswordReset.updateOne({ token }, { used: true });
+      await logAction(user._id, "PASSWORD_RESET_EMAIL_FAILED", "User", error.message);
+      return res.status(502).json({ message: "Could not send OTP email. Check SMTP settings and try again." });
+    }
     await logAction(user._id, "PASSWORD_RESET_REQUEST", "User", user.email);
     return res.json({ message: "OTP sent to your registered email.", resetToken: token, email: { to: user.email, messageId: email.messageId } });
   }
