@@ -1,11 +1,21 @@
 services:
   - type: web
     name: naac-file-management-api
-    env: node
+    runtime: node
     rootDir: server
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET

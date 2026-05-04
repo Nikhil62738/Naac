@@ -65,6 +65,42 @@ Frontend: `http://localhost:5173`
 
 Backend: `http://localhost:5000`
 
+## Deploy Backend on Render
+
+The repo includes a root `render.yaml` blueprint for the backend service.
+
+1. Push this project to GitHub.
+2. In Render, create a new Blueprint from the GitHub repo.
+3. Render will use:
+
+```text
+Root directory: server
+Build command: npm ci
+Start command: npm start
+Health check: /api/health
+```
+
+4. Add these Render environment variables:
+
+```text
+MONGO_URI=your MongoDB Atlas connection string
+JWT_SECRET=use a long random secret
+CLIENT_ORIGIN=your deployed frontend URL
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASS=your Gmail app password
+SMTP_FROM=NAAC Portal <your-gmail@gmail.com>
+```
+
+`UPLOAD_DIR` is already set in `render.yaml` to `/var/data/uploads` and the blueprint attaches a 1 GB disk at `/var/data`, so uploaded files survive redeploys and restarts.
+
+5. After Render deploys the backend, copy the service URL and set the frontend environment variable:
+
+```text
+VITE_API_URL=https://your-render-service.onrender.com/api
+```
+
 ## Demo Accounts
 
 HOD:

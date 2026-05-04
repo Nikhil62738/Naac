@@ -24,9 +24,20 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
+    const normalizedOrigin = origin?.replace(/\/$/, "");
+    if (
+      !origin ||
+      allowedOrigins.includes(normalizedOrigin) ||
+      normalizedOrigin?.endsWith(".netlify.app") ||
+      normalizedOrigin?.startsWith("http://localhost:")
+    ) {
+      return callback(null, true);
+    }
     return callback(new Error(`CORS blocked for origin: ${origin}`));
-  }
+  },
+  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  optionsSuccessStatus: 204
 }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
