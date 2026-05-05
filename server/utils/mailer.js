@@ -1,21 +1,27 @@
 import nodemailer from "nodemailer";
 import https from "https";
 
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-
 let emailTransporter = null;
+let initialized = false;
 
-if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
-  emailTransporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-    tls: { rejectUnauthorized: false }, // Useful for Render/hosting platforms
-    family: 4 // Force IPv4 to avoid ENETUNREACH on IPv6, very common on Render
-  });
+function getTransporter() {
+  if (initialized) return emailTransporter;
+  initialized = true;
+
+  const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+
+  if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
+    emailTransporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+      tls: { rejectUnauthorized: false }, // Useful for Render/hosting platforms
+      family: 4 // Force IPv4 to avoid ENETUNREACH on IPv6, very common on Render
+    });
+  }
+  return emailTransporter;
 }
 
 function escapeHtml(value) {
@@ -31,7 +37,7 @@ async function sendViaBrevo(to, subject, html) {
   if (!BREVO_API_KEY) return false;
   
   const data = JSON.stringify({
-    sender: { name: "NAAC Portal", email: EMAIL_USER || "no-reply@naac.local" },
+    sender: { name: "NAAC Portal", email: process.env.EMAIL_USER || process.env.SMTP_USER || "no-reply@naac.local" },
     to: [{ email: to }],
     subject,
     htmlContent: html
@@ -45,7 +51,7 @@ async function sendViaBrevo(to, subject, html) {
     headers: { 
       'Accept': 'application/json', 
       'Content-Type': 'application/json', 
-      'api-key': BREVO_API_KEY 
+      'api-key': process.env.BREVO_API_KEY 
     }
   };
 
@@ -70,11 +76,14 @@ async function sendViaBrevo(to, subject, html) {
 }
 
 async function sendEmailUniversal(to, subject, html, text) {
+  const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const transporter = getTransporter();
+
   // 1. Try Nodemailer first (Primary protocol)
-  if (emailTransporter) {
+  if (transporter) {
     try {
-      const info = await emailTransporter.sendMail({
-        from: process.env.SMTP_FROM || `"NAAC Portal" <${EMAIL_USER || 'no-reply@naac.local'}>`,
+      const info = await transporter.sendMail({
+        from: `"NAAC Portal" <${EMAIL_USER}>`,
         to,
         subject,
         text,
@@ -88,7 +97,7 @@ async function sendEmailUniversal(to, subject, html, text) {
   }
 
   // 2. Try Brevo HTTPS fallback (Secondary protocol)
-  if (BREVO_API_KEY) {
+  if (process.env.BREVO_API_KEY) {
     const success = await sendViaBrevo(to, subject, html);
     if (success) {
       console.log(`[Email Sent] Brevo SUCCESS to: ${to}`);
