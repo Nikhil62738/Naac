@@ -8,20 +8,37 @@ function getTransporter() {
   initialized = true;
 
   const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+  
+  // OAuth2 Credentials for Gmail API (Required for Render)
+  const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+  const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+  const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 
-  if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
+  if (EMAIL_USER && GMAIL_CLIENT_ID && GMAIL_CLIENT_SECRET && GMAIL_REFRESH_TOKEN) {
+    // Gmail API via OAuth2 (uses Port 443, not blocked by Render)
     emailTransporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-      tls: { 
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000
+      auth: {
+        type: 'OAuth2',
+        user: EMAIL_USER,
+        clientId: GMAIL_CLIENT_ID,
+        clientSecret: GMAIL_CLIENT_SECRET,
+        refreshToken: GMAIL_REFRESH_TOKEN
+      }
     });
+    console.log("[Mailer] Configured using Gmail API (OAuth2)");
+  } else {
+    // Fallback to SMTP for local development
+    const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+    if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
+      emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: EMAIL_USER, pass: EMAIL_PASS }
+      });
+      console.log("[Mailer] Configured using Gmail SMTP (Local/Legacy)");
+    }
   }
+  
   return emailTransporter;
 }
 
@@ -47,11 +64,10 @@ async function sendEmailUniversal(to, subject, html, text) {
         text,
         html
       });
-      console.log(`[Email Sent] Gmail SMTP SUCCESS to: ${to}`);
+      console.log(`[Email Sent] SUCCESS to: ${to}`);
       return { messageId: info.messageId, preview: "" };
     } catch (e) {
-      console.error("[Email Failed] Gmail SMTP error:", e.message);
-      // If it fails, we don't catch it silently in production to notify the user
+      console.error("[Email Failed] Error:", e.message);
       if (process.env.NODE_ENV === "production") {
         throw e;
       }
@@ -64,7 +80,7 @@ async function sendEmailUniversal(to, subject, html, text) {
     return { messageId: "mock-id", preview: "" };
   }
 
-  throw new Error("Gmail SMTP provider failed to connect. Please ensure Port 587 is open and App Password is correct.");
+  throw new Error("Email provider failed. For Render, ensure Gmail API OAuth2 credentials are set.");
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
