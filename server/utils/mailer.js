@@ -83,7 +83,17 @@ async function sendEmailUniversal(to, subject, html, text) {
   const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
   const transporter = getTransporter();
 
-  // 1. Try Nodemailer first (Primary protocol)
+  // 1. Try Brevo HTTPS FIRST (More reliable on cloud platforms like Render)
+  if (process.env.BREVO_API_KEY) {
+    const success = await sendViaBrevo(to, subject, html);
+    if (success) {
+      console.log(`[Email Sent] Brevo SUCCESS to: ${to}`);
+      return { messageId: "brevo-id", preview: "" };
+    }
+    console.warn("[Email Warning] Brevo failed, falling back to SMTP...");
+  }
+
+  // 2. Try Nodemailer (SMTP Fallback)
   if (transporter) {
     try {
       const info = await transporter.sendMail({
@@ -100,22 +110,13 @@ async function sendEmailUniversal(to, subject, html, text) {
     }
   }
 
-  // 2. Try Brevo HTTPS fallback (Secondary protocol)
-  if (process.env.BREVO_API_KEY) {
-    const success = await sendViaBrevo(to, subject, html);
-    if (success) {
-      console.log(`[Email Sent] Brevo SUCCESS to: ${to}`);
-      return { messageId: "brevo-id", preview: "" };
-    }
-  }
-
   // 3. Mock Fallback (only for local development)
   if (process.env.NODE_ENV !== "production") {
     console.log(`\n📧 [Email Mock] To: ${to} | Subject: ${subject}\n`);
     return { messageId: "mock-id", preview: "" };
   }
 
-  throw new Error("All email providers failed or were not configured.");
+  throw new Error("All email providers failed. On Render, please use BREVO_API_KEY for reliable delivery.");
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
