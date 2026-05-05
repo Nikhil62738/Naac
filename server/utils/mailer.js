@@ -38,8 +38,10 @@ async function getAccessToken() {
       res.on('end', () => {
         const response = JSON.parse(body);
         if (response.access_token) {
+          console.log("[Mailer] Access token received successfully.");
           resolve(response.access_token);
         } else {
+          console.error("[Mailer] Failed to get access token:", body);
           reject(new Error(`Failed to get access token: ${body}`));
         }
       });
@@ -79,6 +81,7 @@ async function sendViaGmailAPI(to, subject, html) {
 
     const data = JSON.stringify({ raw: encodedMail });
 
+    console.log("[Mailer] Sending message via Gmail API...");
     const options = {
       hostname: 'gmail.googleapis.com',
       port: 443,
