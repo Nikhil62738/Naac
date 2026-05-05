@@ -1,45 +1,116 @@
-import nodemailer from "nodemailer";
+import https from "https";
 
 let emailTransporter = null;
 let initialized = false;
 
-function getTransporter() {
-  if (initialized) return emailTransporter;
-  initialized = true;
+// Gmail API OAuth2 Credentials
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
+const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
 
-  const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
-  
-  // OAuth2 Credentials for Gmail API (Required for Render)
-  const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
-  const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-  const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
+/**
+ * Gets a fresh Access Token using the Refresh Token
+ */
+async function getAccessToken() {
+  const data = JSON.stringify({
+    client_id: GMAIL_CLIENT_ID,
+    client_secret: GMAIL_CLIENT_SECRET,
+    refresh_token: GMAIL_REFRESH_TOKEN,
+    grant_type: 'refresh_token'
+  });
 
-  if (EMAIL_USER && GMAIL_CLIENT_ID && GMAIL_CLIENT_SECRET && GMAIL_REFRESH_TOKEN) {
-    // Gmail API via OAuth2 (uses Port 443, not blocked by Render)
-    emailTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: EMAIL_USER,
-        clientId: GMAIL_CLIENT_ID,
-        clientSecret: GMAIL_CLIENT_SECRET,
-        refreshToken: GMAIL_REFRESH_TOKEN
-      }
-    });
-    console.log("[Mailer] Configured using Gmail API (OAuth2)");
-  } else {
-    // Fallback to SMTP for local development
-    const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-    if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
-      emailTransporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: EMAIL_USER, pass: EMAIL_PASS }
-      });
-      console.log("[Mailer] Configured using Gmail SMTP (Local/Legacy)");
+  const options = {
+    hostname: 'oauth2.googleapis.com',
+    port: 443,
+    path: '/token',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': data.length
     }
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        const response = JSON.parse(body);
+        if (response.access_token) {
+          resolve(response.access_token);
+        } else {
+          reject(new Error(`Failed to get access token: ${body}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+/**
+ * Sends email via Gmail API (HTTPS - Port 443)
+ * This bypasses SMTP blocks on Render.
+ */
+async function sendViaGmailAPI(to, subject, html) {
+  try {
+    const accessToken = await getAccessToken();
+    
+    // Create RFC 822 formatted message
+    const str = [
+      `Content-Type: text/html; charset="UTF-8"`,
+      `MIME-Version: 1.0`,
+      `Content-Transfer-Encoding: 7bit`,
+      `to: ${to}`,
+      `from: "NAAC Portal" <${EMAIL_USER}>`,
+      `subject: ${subject}`,
+      ``,
+      html
+    ].join('\n');
+
+    // Base64URL encode the message
+    const encodedMail = Buffer.from(str)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    const data = JSON.stringify({ raw: encodedMail });
+
+    const options = {
+      hostname: 'gmail.googleapis.com',
+      port: 443,
+      path: '/gmail/v1/users/me/messages/send',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': data.length
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            resolve(JSON.parse(body));
+          } else {
+            reject(new Error(`Gmail API error: ${body}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.write(data);
+      req.end();
+    });
+  } catch (error) {
+    console.error("[Gmail API Failed]:", error.message);
+    throw error;
   }
-  
-  return emailTransporter;
 }
 
 function escapeHtml(value) {
@@ -52,25 +123,14 @@ function escapeHtml(value) {
 }
 
 async function sendEmailUniversal(to, subject, html, text) {
-  const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const transporter = getTransporter();
-
-  if (transporter) {
+  // Use Gmail API (HTTPS) if credentials are present
+  if (GMAIL_CLIENT_ID && GMAIL_CLIENT_SECRET && GMAIL_REFRESH_TOKEN) {
     try {
-      const info = await transporter.sendMail({
-        from: `"NAAC Portal" <${EMAIL_USER}>`,
-        to,
-        subject,
-        text,
-        html
-      });
-      console.log(`[Email Sent] SUCCESS to: ${to}`);
-      return { messageId: info.messageId, preview: "" };
+      const result = await sendViaGmailAPI(to, subject, html);
+      console.log(`[Email Sent] Gmail API (HTTPS) SUCCESS to: ${to}`);
+      return { messageId: result.id, preview: "" };
     } catch (e) {
-      console.error("[Email Failed] Error:", e.message);
-      if (process.env.NODE_ENV === "production") {
-        throw e;
-      }
+      if (process.env.NODE_ENV === "production") throw e;
     }
   }
 
@@ -80,86 +140,50 @@ async function sendEmailUniversal(to, subject, html, text) {
     return { messageId: "mock-id", preview: "" };
   }
 
-  throw new Error("Email provider failed. For Render, ensure Gmail API OAuth2 credentials are set.");
+  throw new Error("Email sending failed. Ensure Gmail API OAuth2 credentials are set correctly in Render.");
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
   const subject = "NAAC Documentation Reminder";
-  const text = [
-    `Hello ${teacherName},`,
-    "",
-    message,
-    "",
-    `Reminder sent by: ${senderName}`,
-    "",
-    "Please log in to the NAAC File Management System and complete the pending work."
-  ].join("\n");
   const html = `
     <p>Hello ${teacherName},</p>
     <p>${escapeHtml(message)}</p>
     <p><strong>Reminder sent by:</strong> ${escapeHtml(senderName)}</p>
     <p>Please log in to the NAAC File Management System and complete the pending work.</p>
   `;
-
-  return sendEmailUniversal(to, subject, html, text);
+  return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendVerificationEmail({ to, teacherName, senderName, criterionCode, status, comment }) {
   const message = `${criterionCode} has been marked ${status}.${comment ? ` Comment: ${comment}` : ""}`;
   const subject = `NAAC ${criterionCode} ${status}`;
-  const text = [
-    `Hello ${teacherName},`,
-    "",
-    message,
-    "",
-    `Reviewed by: ${senderName}`,
-    "",
-    "Please log in to the NAAC File Management System to view the updated status."
-  ].join("\n");
   const html = `
     <p>Hello ${escapeHtml(teacherName)},</p>
     <p>${escapeHtml(message)}</p>
     <p><strong>Reviewed by:</strong> ${escapeHtml(senderName)}</p>
     <p>Please log in to the NAAC File Management System to view the updated status.</p>
   `;
-
-  return sendEmailUniversal(to, subject, html, text);
+  return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendPasswordOtpEmail({ to, name, otp }) {
   const subject = "NAAC Portal Password Reset OTP";
-  const text = [
-    `Hello ${name},`,
-    "",
-    `Your password reset OTP is: ${otp}`,
-    "",
-    "This OTP is valid for 10 minutes. If you did not request this, ignore this email."
-  ].join("\n");
   const html = `
     <p>Hello ${escapeHtml(name)},</p>
     <p>Your password reset OTP is:</p>
     <h2>${escapeHtml(otp)}</h2>
     <p>This OTP is valid for 10 minutes. If you did not request this, ignore this email.</p>
   `;
-
-  return sendEmailUniversal(to, subject, html, text);
+  return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendLoginOtpEmail({ to, name, otp }) {
   const subject = "NAAC Portal Login OTP";
-  const text = [
-    `Hello ${name},`,
-    "",
-    `Your login OTP is: ${otp}`,
-    "",
-    "This OTP is valid for 5 minutes."
-  ].join("\n");
   const html = `
     <p>Hello ${escapeHtml(name)},</p>
     <p>Your login OTP is:</p>
     <h2>${escapeHtml(otp)}</h2>
     <p>This OTP is valid for 5 minutes.</p>
   `;
-
-  return sendEmailUniversal(to, subject, html, text);
+  return sendEmailUniversal(to, subject, html);
 }
