@@ -109,9 +109,13 @@ async function sendEmailUniversal(to, subject, html, text) {
     }
   }
 
-  // 3. Mock Fallback (for local development without keys)
-  console.log(`\n📧 [Email Mock] To: ${to} | Subject: ${subject}\n`);
-  return { messageId: "mock-id", preview: "" };
+  // 3. Mock Fallback (only for local development)
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`\n📧 [Email Mock] To: ${to} | Subject: ${subject}\n`);
+    return { messageId: "mock-id", preview: "" };
+  }
+
+  throw new Error("All email providers failed or were not configured.");
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
