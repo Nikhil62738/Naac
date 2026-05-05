@@ -1,8 +1,5 @@
 import https from "https";
 
-let emailTransporter = null;
-let initialized = false;
-
 // Gmail API OAuth2 Credentials
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
@@ -38,10 +35,8 @@ async function getAccessToken() {
       res.on('end', () => {
         const response = JSON.parse(body);
         if (response.access_token) {
-          console.log("[Mailer] Access token received successfully.");
           resolve(response.access_token);
         } else {
-          console.error("[Mailer] Failed to get access token:", body);
           reject(new Error(`Failed to get access token: ${body}`));
         }
       });
@@ -54,17 +49,14 @@ async function getAccessToken() {
 
 /**
  * Sends email via Gmail API (HTTPS - Port 443)
- * This bypasses SMTP blocks on Render.
  */
 async function sendViaGmailAPI(to, subject, html) {
   try {
     const accessToken = await getAccessToken();
     
-    // Create RFC 822 formatted message
     const str = [
       `Content-Type: text/html; charset="UTF-8"`,
       `MIME-Version: 1.0`,
-      `Content-Transfer-Encoding: 7bit`,
       `to: ${to}`,
       `from: "NAAC Portal" <${EMAIL_USER}>`,
       `subject: ${subject}`,
@@ -72,7 +64,6 @@ async function sendViaGmailAPI(to, subject, html) {
       html
     ].join('\n');
 
-    // Base64URL encode the message
     const encodedMail = Buffer.from(str)
       .toString('base64')
       .replace(/\+/g, '-')
@@ -81,7 +72,6 @@ async function sendViaGmailAPI(to, subject, html) {
 
     const data = JSON.stringify({ raw: encodedMail });
 
-    console.log("[Mailer] Sending message via Gmail API...");
     const options = {
       hostname: 'gmail.googleapis.com',
       port: 443,
@@ -125,68 +115,127 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-async function sendEmailUniversal(to, subject, html, text) {
-  // Use Gmail API (HTTPS) if credentials are present
+/**
+ * Base Email Template Wrapper
+ */
+function emailTemplate(title, content, footer = "") {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
+        .header { background: #1a73e8; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px; line-height: 1.6; color: #333; }
+        .footer { background: #f8f9fa; color: #666; padding: 15px; text-align: center; font-size: 12px; border-top: 1px solid #e0e0e0; }
+        .btn { display: inline-block; padding: 12px 24px; background: #1a73e8; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+        .otp { font-size: 32px; font-weight: bold; color: #1a73e8; letter-spacing: 4px; padding: 10px; background: #f1f3f4; display: inline-block; border-radius: 4px; margin: 20px 0; }
+        .warning { color: #d93025; font-size: 13px; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${title}</h1>
+        </div>
+        <div class="content">
+          ${content}
+        </div>
+        <div class="footer">
+          <p>&copy; 2026 NAAC File Management System</p>
+          <p>${footer}</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function sendEmailUniversal(to, subject, html) {
   if (GMAIL_CLIENT_ID && GMAIL_CLIENT_SECRET && GMAIL_REFRESH_TOKEN) {
     try {
-      const result = await sendViaGmailAPI(to, subject, html);
-      console.log(`[Email Sent] Gmail API (HTTPS) SUCCESS to: ${to}`);
-      return { messageId: result.id, preview: "" };
+      await sendViaGmailAPI(to, subject, html);
+      console.log(`[Email Sent] Gmail API SUCCESS to: ${to}`);
+      return { success: true };
     } catch (e) {
       if (process.env.NODE_ENV === "production") throw e;
     }
   }
 
-  // Local development fallback
   if (process.env.NODE_ENV !== "production") {
     console.log(`\n📧 [Email Mock] To: ${to} | Subject: ${subject}\n`);
-    return { messageId: "mock-id", preview: "" };
+    return { success: true, mock: true };
   }
 
-  throw new Error("Email sending failed. Ensure Gmail API OAuth2 credentials are set correctly in Render.");
+  throw new Error("Email sending failed. Configuration missing.");
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
-  const subject = "NAAC Documentation Reminder";
-  const html = `
-    <p>Hello ${teacherName},</p>
-    <p>${escapeHtml(message)}</p>
-    <p><strong>Reminder sent by:</strong> ${escapeHtml(senderName)}</p>
-    <p>Please log in to the NAAC File Management System and complete the pending work.</p>
-  `;
+  const subject = "⚠️ NAAC Documentation Reminder";
+  const html = emailTemplate(
+    "Pending Task Reminder",
+    `
+      <p>Hello <strong>${escapeHtml(teacherName)}</strong>,</p>
+      <p>This is a reminder regarding pending work on the NAAC Portal.</p>
+      <div style="background: #fff8e1; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+        <p style="margin:0;"><strong>Message:</strong></p>
+        <p style="margin:5px 0 0 0; color: #5f6368;">"${escapeHtml(message)}"</p>
+      </div>
+      <p>Sent by: <strong>${escapeHtml(senderName)}</strong></p>
+      <a href="https://naacfile.netlify.app" class="btn">Log in to Portal</a>
+    `,
+    "Please complete the pending documents as soon as possible."
+  );
   return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendVerificationEmail({ to, teacherName, senderName, criterionCode, status, comment }) {
-  const message = `${criterionCode} has been marked ${status}.${comment ? ` Comment: ${comment}` : ""}`;
-  const subject = `NAAC ${criterionCode} ${status}`;
-  const html = `
-    <p>Hello ${escapeHtml(teacherName)},</p>
-    <p>${escapeHtml(message)}</p>
-    <p><strong>Reviewed by:</strong> ${escapeHtml(senderName)}</p>
-    <p>Please log in to the NAAC File Management System to view the updated status.</p>
-  `;
+  const subject = `📌 NAAC Update: ${criterionCode} is ${status}`;
+  const html = emailTemplate(
+    "Criterion Status Update",
+    `
+      <p>Hello <strong>${escapeHtml(teacherName)}</strong>,</p>
+      <p>Your submission for <strong>${escapeHtml(criterionCode)}</strong> has been reviewed.</p>
+      <p>New Status: <span style="color: ${status === 'Approved' ? '#1e8e3e' : '#d93025'}; font-weight: bold;">${status}</span></p>
+      ${comment ? `<p><strong>Reviewer Comment:</strong> "${escapeHtml(comment)}"</p>` : ''}
+      <p>Reviewed by: <strong>${escapeHtml(senderName)}</strong></p>
+      <a href="https://naacfile.netlify.app" class="btn">View Submission</a>
+    `,
+    "You can view more details in your dashboard."
+  );
   return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendPasswordOtpEmail({ to, name, otp }) {
-  const subject = "NAAC Portal Password Reset OTP";
-  const html = `
-    <p>Hello ${escapeHtml(name)},</p>
-    <p>Your password reset OTP is:</p>
-    <h2>${escapeHtml(otp)}</h2>
-    <p>This OTP is valid for 10 minutes. If you did not request this, ignore this email.</p>
-  `;
+  const subject = "🔑 NAAC Portal: Password Reset OTP";
+  const html = emailTemplate(
+    "Password Reset Request",
+    `
+      <p>Hello <strong>${escapeHtml(name)}</strong>,</p>
+      <p>We received a request to reset your password. Use the following code to continue:</p>
+      <div style="text-align: center;">
+        <div class="otp">${escapeHtml(otp)}</div>
+      </div>
+      <p class="warning">This OTP is valid for <strong>10 minutes</strong>. If you did not request this reset, please change your password immediately or contact the admin.</p>
+    `,
+    "For security reasons, never share your OTP with anyone."
+  );
   return sendEmailUniversal(to, subject, html);
 }
 
 export async function sendLoginOtpEmail({ to, name, otp }) {
-  const subject = "NAAC Portal Login OTP";
-  const html = `
-    <p>Hello ${escapeHtml(name)},</p>
-    <p>Your login OTP is:</p>
-    <h2>${escapeHtml(otp)}</h2>
-    <p>This OTP is valid for 5 minutes.</p>
-  `;
+  const subject = "🔒 NAAC Portal: Login OTP";
+  const html = emailTemplate(
+    "Security Verification",
+    `
+      <p>Hello <strong>${escapeHtml(name)}</strong>,</p>
+      <p>Your one-time password (OTP) for logging into the NAAC Portal is:</p>
+      <div style="text-align: center;">
+        <div class="otp">${escapeHtml(otp)}</div>
+      </div>
+      <p class="warning">This OTP is valid for <strong>5 minutes</strong>. If you did not attempt to log in, please secure your account.</p>
+    `,
+    "Secure login enabled for HOD account."
+  );
   return sendEmailUniversal(to, subject, html);
 }
