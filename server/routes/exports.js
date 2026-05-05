@@ -28,7 +28,7 @@ router.get("/hod/backup.zip", requireRole("hod", "iqac"), sendBackupZip);
 async function sendTeacherExcel(req, res, teacherId) {
   const teacher = await User.findById(teacherId).lean();
   const submissions = await Submission.find({ teacher: teacherId }).populate("verifiedBy", "name email role").lean();
-  const docs = await Document.find({ teacher: teacherId }).lean();
+  const docs = await Document.find({ teacher: teacherId }).select("-fileData").lean();
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "NAAC File Management System";
 
@@ -77,7 +77,7 @@ async function sendTeacherExcel(req, res, teacherId) {
 async function sendTeacherPdf(req, res, teacherId) {
   const teacher = await User.findById(teacherId).lean();
   const submissions = await Submission.find({ teacher: teacherId }).lean();
-  const docs = await Document.find({ teacher: teacherId }).lean();
+  const docs = await Document.find({ teacher: teacherId }).select("-fileData").lean();
   const doc = new PDFDocument({ margin: 48, compress: false });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${teacher.name}-naac-report.pdf"`);
@@ -153,7 +153,7 @@ function drawVerifiedStamp(doc, submission) {
 async function sendHodExcel(req, res) {
   const teachers = await User.find({ role: "teacher" }).lean();
   const submissions = await Submission.find().populate("teacher", "name email department").lean();
-  const docs = await Document.find().populate("teacher", "name email").lean();
+  const docs = await Document.find().select("-fileData").populate("teacher", "name email").lean();
   const workbook = new ExcelJS.Workbook();
   const summary = workbook.addWorksheet("Summary");
   summary.columns = [
@@ -217,7 +217,7 @@ async function sendHodExcel(req, res) {
 }
 
 async function sendBackupZip(req, res) {
-  const docs = await Document.find().populate("teacher", "name email").lean();
+  const docs = await Document.find().select("-fileData").populate("teacher", "name email").lean();
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", "attachment; filename=\"naac-document-backup.zip\"");
   const archive = archiver("zip", { zlib: { level: 9 } });
@@ -227,10 +227,17 @@ async function sendBackupZip(req, res) {
   });
   archive.pipe(res);
   for (const doc of docs) {
-    const filePath = uploadPath(doc.storedName);
-    if (fs.existsSync(filePath)) {
-      const teacherName = (doc.teacher?.name || "Unknown Teacher").replace(/[^a-zA-Z0-9._-]/g, "_");
-      archive.file(filePath, { name: `${teacherName}/${doc.criterionCode}/v${doc.version}-${doc.originalName}` });
+    const fullDoc = await Document.findById(doc._id).select("+fileData");
+    const teacherName = (doc.teacher?.name || "Unknown Teacher").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const zipName = `${teacherName}/${doc.criterionCode}/v${doc.version}-${doc.originalName}`;
+
+    if (fullDoc && fullDoc.fileData) {
+      archive.append(fullDoc.fileData, { name: zipName });
+    } else {
+      const filePath = uploadPath(doc.storedName);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: zipName });
+      }
     }
   }
   await logAction(req.user._id, "EXPORT_BACKUP_ZIP", "Export", `${docs.length} files`);

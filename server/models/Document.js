@@ -11,6 +11,7 @@ const documentSchema = new mongoose.Schema(
     replacedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Document" },
     mimeType: { type: String, required: true },
     size: { type: Number, required: true },
+    fileData: { type: Buffer },
     status: { type: String, enum: ["Pending", "Uploaded", "Verified", "Needs Revision"], default: "Uploaded" },
     scanStatus: { type: String, enum: ["Pending Scan", "Clean", "Rejected"], default: "Clean" }
   },

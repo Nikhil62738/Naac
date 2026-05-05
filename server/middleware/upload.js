@@ -16,16 +16,7 @@ const allowed = new Set([
   "image/png"
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safe}`);
-  }
-});
+const storage = multer.memoryStorage();
 
 export const upload = multer({
   storage,
