@@ -18,7 +18,10 @@ function getTransporter() {
       secure: true,
       auth: { user: EMAIL_USER, pass: EMAIL_PASS },
       tls: { rejectUnauthorized: false }, // Useful for Render/hosting platforms
-      family: 4 // Force IPv4 to avoid ENETUNREACH on IPv6, very common on Render
+      family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6
+      connectionTimeout: 5000, // 5 seconds
+      greetingTimeout: 5000,   // 5 seconds
+      socketTimeout: 5000      // 5 seconds
     });
   }
   return emailTransporter;
@@ -34,7 +37,8 @@ function escapeHtml(value) {
 }
 
 async function sendViaBrevo(to, subject, html) {
-  if (!BREVO_API_KEY) return false;
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return false;
   
   const data = JSON.stringify({
     sender: { name: "NAAC Portal", email: process.env.EMAIL_USER || process.env.SMTP_USER || "no-reply@naac.local" },
