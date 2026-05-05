@@ -11,18 +11,13 @@ function getTransporter() {
   const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
   if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
-    // Switching to Port 587 (STARTTLS) which is often more compatible with cloud hosting than Port 465
     emailTransporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // true for 465, false for other ports
+      service: 'gmail',
       auth: { user: EMAIL_USER, pass: EMAIL_PASS },
       tls: { 
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
+        rejectUnauthorized: false
       },
-      family: 4, // Force IPv4
-      connectionTimeout: 10000, // 10 seconds
+      connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000
     });
