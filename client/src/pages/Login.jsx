@@ -4,9 +4,10 @@ import { api } from "../api/http";
 import { useAuth } from "../main";
 
 export default function Login() {
-  const [form, setForm] = useState({ email: "teacher@naac.local", password: "teacher12345" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login");
+  const [otp, setOtp] = useState("");
   const [reset, setReset] = useState({ token: "", email: "", otp: "", newPassword: "", confirmPassword: "", message: "" });
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -16,10 +17,26 @@ export default function Login() {
     setError("");
     try {
       const { data } = await api.post("/auth/login", form);
+      if (data.requiresOtp) {
+        setMode("otp-login");
+        return;
+      }
       login(data);
       navigate(data.user.role === "hod" ? "/hod" : "/teacher");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
+    }
+  }
+
+  async function verifyLogin(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      const { data } = await api.post("/auth/login/verify", { email: form.email, otp });
+      login(data);
+      navigate(data.user.role === "hod" ? "/hod" : "/teacher");
+    } catch (err) {
+      setError(err.response?.data?.message || "OTP verification failed");
     }
   }
 
@@ -90,7 +107,16 @@ export default function Login() {
         <button>Login</button>
         <button type="button" className="secondary" onClick={openForgot}>Forgot Password</button>
         <p>New teacher? <Link to="/register">Create account</Link></p>
-        <small>Demo HOD: hod@naac.local / hod12345 | IQAC: iqac@naac.local / iqac12345</small>
+      </form>
+      ) : mode === "otp-login" ? (
+      <form className="auth-card" onSubmit={verifyLogin}>
+        <span className="eyebrow">Security Verification</span>
+        <h1>Verify OTP</h1>
+        <p>A 6-digit OTP has been sent to <strong>{form.email}</strong></p>
+        <input placeholder="Enter OTP" value={otp} maxLength={6} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
+        {error && <p className="error">{error}</p>}
+        <button>Verify and Login</button>
+        <button type="button" className="secondary" onClick={() => setMode("login")}>Back</button>
       </form>
       ) : (
       <form className="auth-card" onSubmit={(e) => e.preventDefault()}>
