@@ -171,7 +171,7 @@ async function sendEmailUniversal(to, subject, html) {
 }
 
 export async function sendReminderEmail({ to, teacherName, senderName, message }) {
-  const subject = "⚠️ NAAC Documentation Reminder";
+  const subject = "NAAC Documentation Reminder";
   const html = emailTemplate(
     "Pending Task Reminder",
     `
@@ -190,7 +190,7 @@ export async function sendReminderEmail({ to, teacherName, senderName, message }
 }
 
 export async function sendVerificationEmail({ to, teacherName, senderName, criterionCode, status, comment }) {
-  const subject = `📌 NAAC Update: ${criterionCode} is ${status}`;
+  const subject = `NAAC Update: ${criterionCode} is ${status}`;
   const html = emailTemplate(
     "Criterion Status Update",
     `
@@ -207,7 +207,7 @@ export async function sendVerificationEmail({ to, teacherName, senderName, crite
 }
 
 export async function sendPasswordOtpEmail({ to, name, otp }) {
-  const subject = "🔑 NAAC Portal: Password Reset OTP";
+  const subject = "NAAC Portal: Password Reset OTP";
   const html = emailTemplate(
     "Password Reset Request",
     `
@@ -224,7 +224,7 @@ export async function sendPasswordOtpEmail({ to, name, otp }) {
 }
 
 export async function sendLoginOtpEmail({ to, name, otp }) {
-  const subject = "🔒 NAAC Portal: Login OTP";
+  const subject = "NAAC Portal: Login OTP";
   const html = emailTemplate(
     "Security Verification",
     `
