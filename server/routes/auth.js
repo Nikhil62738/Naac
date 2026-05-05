@@ -6,7 +6,7 @@ import User from "../models/User.js";
 import PasswordReset from "../models/PasswordReset.js";
 import { auth } from "../middleware/auth.js";
 import { logAction } from "../utils/audit.js";
-import { sendPasswordOtpEmail } from "../utils/mailer.js";
+import { sendPasswordOtpEmail, sendLoginOtpEmail } from "../utils/mailer.js";
 
 const router = Router();
 
@@ -32,6 +32,37 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
   if (!user.isActive || user.approvalStatus !== "Approved") return res.status(403).json({ message: "Account is pending approval or deactivated" });
+  
+  const otp = String(crypto.randomInt(100000, 999999));
+  user.loginOtp = await bcrypt.hash(otp, 10);
+  user.loginOtpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  await user.save();
+
+  try {
+    await sendLoginOtpEmail({ to: user.email, name: user.name, otp });
+  } catch (error) {
+    console.error("Login OTP send failed:", error);
+    return res.status(502).json({ message: "Could not send login OTP. Please try again later." });
+  }
+
+  res.json({ requiresOtp: true, message: "OTP sent to your email" });
+});
+
+router.post("/login/verify", async (req, res) => {
+  const { email, otp } = req.body;
+  const user = await User.findOne({ email });
+  
+  if (!user || !user.loginOtp || !user.loginOtpExpires || user.loginOtpExpires < new Date()) {
+    return res.status(401).json({ message: "OTP expired or invalid session" });
+  }
+
+  const validOtp = await bcrypt.compare(String(otp), user.loginOtp);
+  if (!validOtp) return res.status(401).json({ message: "Invalid OTP" });
+
+  user.loginOtp = undefined;
+  user.loginOtpExpires = undefined;
+  await user.save();
+
   await logAction(user._id, "LOGIN", "User", email);
   res.json({ token: sign(user), user: clean(user) });
 });

@@ -171,3 +171,23 @@ export async function sendPasswordOtpEmail({ to, name, otp }) {
 
   return sendEmailUniversal(to, subject, html, text);
 }
+
+export async function sendLoginOtpEmail({ to, name, otp }) {
+  const subject = "NAAC Portal Login OTP";
+  const text = [
+    `Hello ${name},`,
+    "",
+    `Your login OTP is: ${otp}`,
+    "",
+    "This OTP is valid for 5 minutes."
+  ].join("\n");
+  const html = `
+    <p>Hello ${escapeHtml(name)},</p>
+    <p>Your login OTP is:</p>
+    <h2>${escapeHtml(otp)}</h2>
+    <p>This OTP is valid for 5 minutes.</p>
+  `;
+
+  return sendEmailUniversal(to, subject, html, text);
+}
+

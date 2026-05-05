@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema(
     department: { type: String, default: "Computer Engineering" },
     subjects: { type: [String], default: [] },
     isActive: { type: Boolean, default: true },
-    approvalStatus: { type: String, enum: ["Pending", "Approved", "Deactivated"], default: "Approved" }
+    approvalStatus: { type: String, enum: ["Pending", "Approved", "Deactivated"], default: "Approved" },
+    loginOtp: { type: String },
+    loginOtpExpires: { type: Date }
   },
   { timestamps: true }
 );
