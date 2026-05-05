@@ -21,24 +21,32 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-app.use(helmet());
-app.use(cors({
-  origin(origin, callback) {
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+const corsOptions = {
+  origin: function (origin, callback) {
     const normalizedOrigin = origin?.replace(/\/$/, "");
     if (
-      !origin ||
-      allowedOrigins.includes(normalizedOrigin) ||
+      !origin || 
+      allowedOrigins.includes(normalizedOrigin) || 
       normalizedOrigin?.endsWith(".netlify.app") ||
       normalizedOrigin?.startsWith("http://localhost:")
     ) {
-      return callback(null, true);
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
     }
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
-  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  optionsSuccessStatus: 204
-}));
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["set-cookie"]
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 app.use("/uploads", (_req, res) => res.status(403).json({ message: "Files require authenticated download" }));
