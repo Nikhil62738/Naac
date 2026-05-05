@@ -8,6 +8,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login");
   const [otp, setOtp] = useState("");
+  const [weakWarning, setWeakWarning] = useState(false);
   const [reset, setReset] = useState({ token: "", email: "", otp: "", newPassword: "", confirmPassword: "", message: "" });
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -18,10 +19,14 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", form);
       if (data.requiresOtp) {
+        if (data.weakPassword) setWeakWarning(true);
         setMode("otp-login");
         return;
       }
       login(data);
+      if (data.weakPassword) {
+        alert("SECURITY NOTICE: Your password is weak. Please change it in your Profile to include uppercase, lowercase, numbers, and special symbols.");
+      }
       navigate(data.user.role === "hod" ? "/hod" : "/teacher");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
@@ -34,6 +39,9 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login/verify", { email: form.email, otp });
       login(data);
+      if (weakWarning || data.weakPassword) {
+        alert("SECURITY NOTICE: Your password is weak. Please change it in your Profile to include uppercase, lowercase, numbers, and special symbols.");
+      }
       navigate(data.user.role === "hod" ? "/hod" : "/teacher");
     } catch (err) {
       setError(err.response?.data?.message || "OTP verification failed");

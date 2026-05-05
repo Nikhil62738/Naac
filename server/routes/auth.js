@@ -19,12 +19,21 @@ function isValidEmail(email) {
   return re.test(String(email).toLowerCase());
 }
 
+function isValidPassword(password) {
+  const re = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return re.test(String(password));
+}
+
 router.post("/register", async (req, res) => {
   const { name, email, password, department, subjects } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: "Name, email and password are required" });
   
   if (!isValidEmail(email)) {
     return res.status(400).json({ message: "Please provide a valid email address" });
+  }
+
+  if (!isValidPassword(password)) {
+    return res.status(400).json({ message: "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special symbol (@$!%*?&)." });
   }
 
   const exists = await User.findOne({ email });
@@ -43,6 +52,9 @@ router.post("/login", async (req, res) => {
   }
   if (!user.isActive || user.approvalStatus !== "Approved") return res.status(403).json({ message: "Account is pending approval or deactivated" });
   
+  // Check for weak password complexity
+  const isWeak = !isValidPassword(password);
+  
   // Only HOD requires 2FA OTP
   if (user.role === "hod") {
     const otp = String(crypto.randomInt(100000, 999999));
@@ -57,12 +69,12 @@ router.post("/login", async (req, res) => {
       return res.status(502).json({ message: "Could not send login OTP. Please try again later." });
     }
 
-    return res.json({ requiresOtp: true, message: "OTP sent to your email" });
+    return res.json({ requiresOtp: true, message: "OTP sent to your email", weakPassword: isWeak });
   }
 
-  // Teachers and IQAC log in directly
+  // Teachers log in directly
   await logAction(user._id, "LOGIN", "User", email);
-  res.json({ token: sign(user), user: clean(user) });
+  res.json({ token: sign(user), user: clean(user), weakPassword: isWeak });
 });
 
 router.post("/login/verify", async (req, res) => {
@@ -131,6 +143,11 @@ router.post("/reset-password", async (req, res) => {
   if (!reset || reset.expiresAt < new Date()) return res.status(400).json({ message: "OTP expired or invalid" });
   const validOtp = await bcrypt.compare(String(otp), reset.otpHash);
   if (!validOtp) return res.status(400).json({ message: "Invalid OTP" });
+
+  if (!isValidPassword(newPassword)) {
+    return res.status(400).json({ message: "New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special symbol (@$!%*?&)." });
+  }
+
   reset.user.passwordHash = await bcrypt.hash(newPassword, 10);
   await reset.user.save();
   reset.used = true;
@@ -145,6 +162,11 @@ router.put("/change-password", auth, async (req, res) => {
   if (String(newPassword).length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
   const user = await User.findById(req.user._id);
   if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash))) return res.status(400).json({ message: "Current password is incorrect" });
+
+  if (!isValidPassword(newPassword)) {
+    return res.status(400).json({ message: "New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special symbol (@$!%*?&)." });
+  }
+
   user.passwordHash = await bcrypt.hash(newPassword, 10);
   await user.save();
   await logAction(user._id, "CHANGE_PASSWORD", "User", user.email);
