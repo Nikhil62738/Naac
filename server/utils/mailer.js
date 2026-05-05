@@ -2,16 +2,16 @@ import nodemailer from "nodemailer";
 import https from "https";
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const EMAIL_USER = process.env.SMTP_USER;
-const EMAIL_PASS = process.env.SMTP_PASS;
+const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
 let emailTransporter = null;
 
 if (EMAIL_USER && EMAIL_PASS && !EMAIL_USER.includes("your-gmail")) {
   emailTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: Number(process.env.SMTP_PORT) === 465 || !process.env.SMTP_PORT, // true for 465, false for 587
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
     tls: { rejectUnauthorized: false }, // Useful for Render/hosting platforms
     family: 4 // Force IPv4 to avoid ENETUNREACH on IPv6, very common on Render
