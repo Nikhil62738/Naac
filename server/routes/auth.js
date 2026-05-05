@@ -14,9 +14,19 @@ function sign(user) {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || "dev-secret", { expiresIn: "7d" });
 }
 
+function isValidEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(String(email).toLowerCase());
+}
+
 router.post("/register", async (req, res) => {
   const { name, email, password, department, subjects } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: "Name, email and password are required" });
+  
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: "Please provide a valid email address" });
+  }
+
   const exists = await User.findOne({ email });
   if (exists) return res.status(409).json({ message: "Email already exists" });
   const passwordHash = await bcrypt.hash(password, 10);
