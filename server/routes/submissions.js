@@ -112,11 +112,8 @@ router.get("/documents/:id/download", async (req, res) => {
   const doc = await Document.findById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Document not found" });
   if (!["hod", "iqac"].includes(req.user.role) && String(doc.teacher) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
-  const docPath = uploadPath(doc.storedName);
-  if (!fs.existsSync(docPath)) return res.status(404).json({ message: "File missing on disk" });
-  await logAction(req.user._id, "DOWNLOAD_DOCUMENT", doc.criterionCode, doc.originalName);
-
   if (doc.fileData) {
+    await logAction(req.user._id, "DOWNLOAD_DOCUMENT", doc.criterionCode, doc.originalName);
     res.setHeader("Content-Disposition", `attachment; filename=\"${doc.originalName}\"`);
     res.setHeader("Content-Type", doc.mimeType);
     return res.send(doc.fileData);
@@ -124,6 +121,7 @@ router.get("/documents/:id/download", async (req, res) => {
 
   const docPath = uploadPath(doc.storedName);
   if (!fs.existsSync(docPath)) return res.status(404).json({ message: "File missing on disk" });
+  await logAction(req.user._id, "DOWNLOAD_DOCUMENT", doc.criterionCode, doc.originalName);
   res.download(docPath, doc.originalName);
 });
 
@@ -133,19 +131,19 @@ router.get("/documents/:id/preview", async (req, res) => {
   if (!["hod", "iqac"].includes(req.user.role) && String(doc.teacher) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
   if (!["application/pdf", "image/jpeg", "image/png"].includes(doc.mimeType)) return res.status(415).json({ message: "Preview supports PDF, JPG, and PNG only" });
   
+  if (doc.fileData) {
+    await logAction(req.user._id, "PREVIEW_DOCUMENT", doc.criterionCode, doc.originalName);
+    res.setHeader("Content-Type", doc.mimeType);
+    res.setHeader("Content-Disposition", `inline; filename=\"${doc.originalName}\"`);
+    return res.send(doc.fileData);
+  }
+
   const docPath = uploadPath(doc.storedName);
   if (!fs.existsSync(docPath)) return res.status(404).json({ message: "File missing on disk" });
   
   await logAction(req.user._id, "PREVIEW_DOCUMENT", doc.criterionCode, doc.originalName);
   res.setHeader("Content-Type", doc.mimeType);
   res.setHeader("Content-Disposition", `inline; filename=\"${doc.originalName}\"`);
-  
-  if (doc.fileData) {
-    return res.send(doc.fileData);
-  }
-
-  const docPath = uploadPath(doc.storedName);
-  if (!fs.existsSync(docPath)) return res.status(404).json({ message: "File missing on disk" });
   
   const stream = fs.createReadStream(docPath);
   stream.on("error", (err) => {
