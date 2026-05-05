@@ -43,19 +43,26 @@ router.post("/login", async (req, res) => {
   }
   if (!user.isActive || user.approvalStatus !== "Approved") return res.status(403).json({ message: "Account is pending approval or deactivated" });
   
-  const otp = String(crypto.randomInt(100000, 999999));
-  user.loginOtp = await bcrypt.hash(otp, 10);
-  user.loginOtpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-  await user.save();
+  // Only HOD requires 2FA OTP
+  if (user.role === "hod") {
+    const otp = String(crypto.randomInt(100000, 999999));
+    user.loginOtp = await bcrypt.hash(otp, 10);
+    user.loginOtpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    await user.save();
 
-  try {
-    await sendLoginOtpEmail({ to: user.email, name: user.name, otp });
-  } catch (error) {
-    console.error("Login OTP send failed:", error);
-    return res.status(502).json({ message: "Could not send login OTP. Please try again later." });
+    try {
+      await sendLoginOtpEmail({ to: user.email, name: user.name, otp });
+    } catch (error) {
+      console.error("Login OTP send failed:", error);
+      return res.status(502).json({ message: "Could not send login OTP. Please try again later." });
+    }
+
+    return res.json({ requiresOtp: true, message: "OTP sent to your email" });
   }
 
-  res.json({ requiresOtp: true, message: "OTP sent to your email" });
+  // Teachers and IQAC log in directly
+  await logAction(user._id, "LOGIN", "User", email);
+  res.json({ token: sign(user), user: clean(user) });
 });
 
 router.post("/login/verify", async (req, res) => {
