@@ -8,6 +8,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login");
   const [otp, setOtp] = useState("");
+  const [otpMessage, setOtpMessage] = useState("");
   const [weakWarning, setWeakWarning] = useState(false);
   const [reset, setReset] = useState({ token: "", email: "", otp: "", newPassword: "", confirmPassword: "", message: "" });
   const [loginLoading, setLoginLoading] = useState(false);
@@ -33,7 +34,10 @@ export default function Login() {
       const { data } = await api.post("/auth/login", form);
       if (data.requiresOtp) {
         if (data.weakPassword) setWeakWarning(true);
+        setOtp("");
+        setOtpMessage(data.message || "OTP sent to your email.");
         setMode("otp-login");
+        setResendSeconds(60);
         setLoginLoading(false);
         return;
       }
@@ -63,6 +67,27 @@ export default function Login() {
     } catch (err) {
       setError(err.response?.data?.message || "OTP verification failed");
       setOtpLoading(false);
+    }
+  }
+
+  async function resendLoginOtp() {
+    if (loginLoading || resendSeconds > 0) return;
+    setError("");
+    setLoginLoading(true);
+    try {
+      const { data } = await api.post("/auth/login", form);
+      if (data.requiresOtp) {
+        setOtp("");
+        setOtpMessage(data.message || "OTP sent again to your email.");
+        setResendSeconds(60);
+        return;
+      }
+      login(data);
+      navigate(data.user.role === "hod" ? "/hod" : "/teacher");
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not resend OTP");
+    } finally {
+      setLoginLoading(false);
     }
   }
 
@@ -129,6 +154,8 @@ export default function Login() {
   function backToLogin() {
     setError("");
     setReset({ token: "", email: "", otp: "", newPassword: "", confirmPassword: "", message: "" });
+    setOtp("");
+    setOtpMessage("");
     setResendSeconds(0);
     setMode("login");
   }
@@ -152,10 +179,15 @@ export default function Login() {
         <span className="eyebrow">Security Verification</span>
         <h1>Verify OTP</h1>
         <p>A 6-digit OTP has been sent to <strong>{form.email}</strong></p>
+        {otpMessage && <p className="success">{otpMessage}</p>}
         <input placeholder="Enter OTP" value={otp} maxLength={6} disabled={otpLoading} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
         {error && <p className="error">{error}</p>}
         <button disabled={otpLoading}>{otpLoading && <span className="button-spinner" />} {otpLoading ? "Verifying..." : "Verify and Login"}</button>
-        <button type="button" className="secondary" disabled={otpLoading} onClick={() => setMode("login")}>Back</button>
+        <button type="button" className="secondary" disabled={loginLoading || otpLoading || resendSeconds > 0} onClick={resendLoginOtp}>
+          {loginLoading && <span className="button-spinner" />}
+          {loginLoading ? "Sending OTP..." : resendSeconds > 0 ? `Resend OTP in ${resendSeconds}s` : "Resend OTP"}
+        </button>
+        <button type="button" className="secondary" disabled={otpLoading || loginLoading} onClick={backToLogin}>Back</button>
       </form>
       ) : (
       <form className="auth-card" onSubmit={(e) => e.preventDefault()}>
