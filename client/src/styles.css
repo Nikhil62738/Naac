@@ -52,6 +52,26 @@ button, .auth-card button {
   justify-content: center;
   gap: 8px;
 }
+button:disabled, input:disabled {
+  cursor: not-allowed;
+  opacity: .68;
+}
+.button-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.45);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin .8s linear infinite;
+}
+.secondary .button-spinner {
+  border-color: rgba(15,61,62,.28);
+  border-top-color: currentColor;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .secondary { background: #e8eee8; color: #0f3d3e; }
 body.dark .secondary { background: #26332c; color: #ecf5ef; }
 
