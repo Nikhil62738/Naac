@@ -89,6 +89,7 @@ body.dark .secondary { background: #26332c; color: #ecf5ef; }
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand span, small, .muted { color: #6e7b72; display: block; }
+body.dark small, body.dark .muted { color: #b8c7bd; }
 .sidebar .brand span { color: #b7c5bd; }
 .sidebar nav { display: grid; gap: 8px; }
 .sidebar a, .ghost, .nav-button {
@@ -118,6 +119,7 @@ main { padding: 28px; }
   margin-bottom: 24px;
 }
 .eyebrow { color: #0f766e; text-transform: uppercase; font-size: 12px; font-weight: 800; }
+body.dark .eyebrow { color: #5eead4; }
 .pill, .status, .mini {
   display: inline-flex;
   align-items: center;
@@ -138,8 +140,10 @@ main { padding: 28px; }
 }
 body.dark .metric, body.dark .panel, body.dark .criterion-card, body.dark .auth-card { background: #19211d; border-color: #2c3a32; color: #edf4ee; }
 body.dark input, body.dark select, body.dark textarea { background: #111914; border-color: #34443b; color: #edf4ee; }
+body.dark input::placeholder, body.dark textarea::placeholder { color: #95a69b; }
 .metric strong { font-size: 34px; display: block; margin: 6px 0; }
 .metric.action { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; color: #0f766e; }
+body.dark .metric.action, body.dark .back-link, body.dark .actions a, body.dark .actions button, body.dark .doc-list a, body.dark .doc-list button, body.dark .download-button { color: #5eead4; }
 .criteria-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 14px; margin-top: 14px; }
 .criterion-card { display: grid; gap: 12px; }
 .criterion-card > div:first-child, .criterion-head, .doc-row, .review-controls, .actions { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
@@ -149,6 +153,10 @@ body.dark input, body.dark select, body.dark textarea { background: #111914; bor
 .status.needs-revision { background: #fee4d8; color: #9a3412; }
 .status.uploaded { background: #dbeafe; color: #1d4ed8; }
 .notice, .doc-row { border-top: 1px solid #edf0ea; padding: 12px 0; }
+body.dark .status.verified { background: #123b2b; color: #86efac; }
+body.dark .status.needs-revision { background: #431f12; color: #fdba74; }
+body.dark .status.uploaded { background: #172554; color: #93c5fd; }
+body.dark .notice, body.dark .doc-row { border-top-color: #2c3a32; }
 
 .form-page { display: grid; grid-template-columns: 1fr 360px; gap: 18px; align-items: start; }
 .data-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
@@ -162,6 +170,8 @@ body.dark input, body.dark select, body.dark textarea { background: #111914; bor
 .back-link { color: #0f766e; font-weight: 800; display: inline-block; margin-bottom: 16px; }
 .error { color: #b42318; }
 .success { color: #146c43; }
+body.dark .error { color: #fca5a5; }
+body.dark .success { color: #86efac; }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
@@ -174,6 +184,9 @@ th { background: #f3f6f1; }
 .readonly-grid div { background: #f7f9f6; border-radius: 6px; padding: 10px; }
 body.dark .readonly-grid div, body.dark th { background: #202b25; }
 .readonly-grid span { color: #657268; display: block; font-size: 12px; }
+body.dark td { border-bottom-color: #2c3a32; }
+body.dark .mini, body.dark .pill, body.dark .status { background: #26332c; color: #edf4ee; }
+body.dark .readonly-grid span { color: #b8c7bd; }
 .doc-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .review-controls { justify-content: flex-start; }
 .review-controls input { max-width: 420px; }
